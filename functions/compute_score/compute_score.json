@@ -1,0 +1,13 @@
+{
+  "name": "compute_score",
+  "description": "Deterministic 0-100 Release-Readiness Score from the PR's open risk flags across 6 weighted dimensions; any open critical caps the total at 59. Writes readiness_score.",
+  "type": "API",
+  "visibility": "POD",
+  "code": { "$file": "code.py" },
+  "permissions": { "grants": [
+    { "resource_type": "datastore_table", "resource_name": "pull_requests",
+      "permission_ids": ["datastore.table.read", "datastore.record.read", "datastore.record.write"] },
+    { "resource_type": "datastore_table", "resource_name": "risk_flags",
+      "permission_ids": ["datastore.table.read", "datastore.record.read"] }
+  ] }
+}

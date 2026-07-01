@@ -1,0 +1,48 @@
+{
+  "name": "evaluate-and-gate",
+  "description": "Evaluate a PR for release readiness. Deterministic first: checklist -> score -> gate, so a PR is ALWAYS gated reliably (fast, no LLM). Then the release-reviewer agent adds judgment risk flags + test plan + release-notes draft, and score/gate re-run to refine. If the (occasionally flaky) agent step fails, the deterministic gate result already stands. Human sign-off happens in the app.",
+  "start": { "type": "MANUAL" },
+  "nodes": [
+    { "id": "intake", "type": "FORM", "label": "PR to evaluate",
+      "config": { "input_schema": {
+        "type": "object",
+        "properties": { "pr_id": { "type": "string" } },
+        "required": ["pr_id"] } } },
+
+    { "id": "checklist", "type": "FUNCTION", "label": "Run deterministic checklist",
+      "config": { "function_name": "run_checklist",
+        "input_mapping": { "pr_id": { "type": "expression", "value": "intake.pr_id" } } } },
+
+    { "id": "score_det", "type": "FUNCTION", "label": "Score (deterministic)",
+      "config": { "function_name": "compute_score",
+        "input_mapping": { "pr_id": { "type": "expression", "value": "intake.pr_id" } } } },
+
+    { "id": "gate_det", "type": "FUNCTION", "label": "Gate (deterministic)",
+      "config": { "function_name": "gate_decision",
+        "input_mapping": { "pr_id": { "type": "expression", "value": "intake.pr_id" } } } },
+
+    { "id": "review", "type": "AGENT", "label": "Release reviewer (judgment risks)",
+      "config": { "agent_name": "release-reviewer",
+        "input_mapping": { "pr_id": { "type": "expression", "value": "intake.pr_id" } } } },
+
+    { "id": "score_final", "type": "FUNCTION", "label": "Re-score with agent risks",
+      "config": { "function_name": "compute_score",
+        "input_mapping": { "pr_id": { "type": "expression", "value": "intake.pr_id" } } } },
+
+    { "id": "gate_final", "type": "FUNCTION", "label": "Final gate",
+      "config": { "function_name": "gate_decision",
+        "input_mapping": { "pr_id": { "type": "expression", "value": "intake.pr_id" } } } },
+
+    { "id": "end", "type": "END", "label": "Evaluated" }
+  ],
+  "edges": [
+    { "id": "e1", "source": "intake", "target": "checklist" },
+    { "id": "e2", "source": "checklist", "target": "score_det" },
+    { "id": "e3", "source": "score_det", "target": "gate_det" },
+    { "id": "e4", "source": "gate_det", "target": "review" },
+    { "id": "e5", "source": "review", "target": "score_final" },
+    { "id": "e6", "source": "score_final", "target": "gate_final" },
+    { "id": "e7", "source": "gate_final", "target": "end" }
+  ],
+  "visibility": "POD"
+}

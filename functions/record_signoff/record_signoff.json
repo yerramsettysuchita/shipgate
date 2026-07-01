@@ -1,0 +1,15 @@
+{
+  "name": "record_signoff",
+  "description": "Persist a human sign-off (approved | changes_requested) as an auditable record: approver, time, score at sign-off, open criticals. Approve -> status=approved; request changes -> status=needs_fixes.",
+  "type": "API",
+  "visibility": "POD",
+  "code": { "$file": "code.py" },
+  "permissions": { "grants": [
+    { "resource_type": "datastore_table", "resource_name": "pull_requests",
+      "permission_ids": ["datastore.table.read", "datastore.record.read", "datastore.record.write"] },
+    { "resource_type": "datastore_table", "resource_name": "risk_flags",
+      "permission_ids": ["datastore.table.read", "datastore.record.read"] },
+    { "resource_type": "datastore_table", "resource_name": "sign_offs",
+      "permission_ids": ["datastore.table.read", "datastore.record.read", "datastore.record.write"] }
+  ] }
+}

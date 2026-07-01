@@ -1,0 +1,12 @@
+{
+  "name": "release_notes",
+  "primary_key_column": "id",
+  "enable_rls": false,
+  "columns": [
+    { "name": "pr_id", "type": "UUID", "required": true,
+      "foreign_key": { "references": "pull_requests.id" } },
+    { "name": "content", "type": "TEXT", "description": "Release notes markdown (Summary / Changes / Breaking / Migration steps)." },
+    { "name": "edited", "type": "BOOLEAN", "default": false }
+  ],
+  "config": {}
+}

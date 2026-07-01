@@ -1,0 +1,16 @@
+{
+  "name": "checklist_results",
+  "primary_key_column": "id",
+  "enable_rls": false,
+  "columns": [
+    { "name": "pr_id", "type": "UUID", "required": true,
+      "foreign_key": { "references": "pull_requests.id" } },
+    { "name": "check_key", "type": "TEXT", "required": true, "max_length": 80 },
+    { "name": "label", "type": "TEXT", "required": true, "max_length": 200 },
+    { "name": "result", "type": "ENUM", "required": true, "default": "na",
+      "options": ["pass", "fail", "na"] },
+    { "name": "evidence", "type": "TEXT", "description": "File/line/hunk evidence for the result." },
+    { "name": "weight", "type": "INTEGER", "default": 0 }
+  ],
+  "config": {}
+}

@@ -1,0 +1,13 @@
+{
+  "name": "evaluate_pr",
+  "description": "Start the evaluate-and-gate workflow for a PR (deterministic checklist -> review agent -> score -> gate). Called by the dashboard to (re-)evaluate. JOB type; the app polls pull_requests for the result.",
+  "type": "JOB",
+  "visibility": "POD",
+  "code": { "$file": "code.py" },
+  "permissions": { "grants": [
+    { "resource_type": "datastore_table", "resource_name": "pull_requests",
+      "permission_ids": ["datastore.table.read", "datastore.record.read", "datastore.record.write"] },
+    { "resource_type": "workflow", "resource_name": "evaluate-and-gate",
+      "permission_ids": ["workflow.read", "workflow.execute"] }
+  ] }
+}

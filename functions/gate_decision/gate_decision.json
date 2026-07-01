@@ -1,0 +1,15 @@
+{
+  "name": "gate_decision",
+  "description": "Gate a PR: block if score < 70 or any open critical flag, else pass to human sign-off. A block on a previously-approved PR is a regression. Sets pull_requests status.",
+  "type": "API",
+  "visibility": "POD",
+  "code": { "$file": "code.py" },
+  "permissions": { "grants": [
+    { "resource_type": "datastore_table", "resource_name": "pull_requests",
+      "permission_ids": ["datastore.table.read", "datastore.record.read", "datastore.record.write"] },
+    { "resource_type": "datastore_table", "resource_name": "risk_flags",
+      "permission_ids": ["datastore.table.read", "datastore.record.read"] },
+    { "resource_type": "datastore_table", "resource_name": "sign_offs",
+      "permission_ids": ["datastore.table.read", "datastore.record.read"] }
+  ] }
+}

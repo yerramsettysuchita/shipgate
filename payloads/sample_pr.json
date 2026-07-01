@@ -1,0 +1,5 @@
+{
+  "title": "Add coupon endpoint and orders migration",
+  "description": "Adds a /coupons endpoint and adds caching with retry+backoff for coupon lookups.",
+  "diff": "diff --git a/api/coupons.py b/api/coupons.py\n--- a/dev/null\n+++ b/api/coupons.py\n@@\n+from fastapi import APIRouter\n+router = APIRouter()\n+\n+@router.post(\"/coupons\")\n+def create_coupon(code: str, pct: int):\n+    API_KEY = \"sk_live_abcd1234efgh5678\"\n+    print(\"debug creating coupon\", code)\n+    return {\"code\": code, \"pct\": pct}\ndiff --git a/migrations/0007_add_coupons.sql b/migrations/0007_add_coupons.sql\n--- a/dev/null\n+++ b/migrations/0007_add_coupons.sql\n@@\n+CREATE TABLE coupons (\n+  id serial primary key,\n+  code text not null,\n+  pct int not null\n+);\n"
+}

@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ShipGate — release-readiness gate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0d1117; --bg2: #010409; --panel: #161b22; --panel2: #0f141b;
+        --line: #22282f; --line2: #30363d; --ink: #e6edf3; --muted: #8b949e; --dim: #6e7681;
+        --accent: #2f81f7; --green: #3fb950; --amber: #d29922; --red: #f85149;
+        --crit: #f85149; --serious: #db6d28; --moderate: #d29922; --minor: #8b949e;
+        --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+        --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body { background: radial-gradient(120% 80% at 100% -10%, #10203a 0%, rgba(13,17,23,0) 45%), var(--bg);
+        color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+      a { color: var(--accent); text-decoration: none; }
+      button { font: inherit; cursor: pointer; }
+      .mono { font-family: var(--mono); }
+      .tnum { font-variant-numeric: tabular-nums; }
+
+      header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 1rem;
+        padding: .75rem clamp(1rem, 3vw, 2rem); background: rgba(1,4,9,.82); backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--line); }
+      .brand { display: flex; align-items: center; gap: .6rem; font-weight: 800; letter-spacing: -.02em; font-size: 1.05rem; }
+      .brand .logo { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(150deg, var(--green), #1f6feb);
+        display: grid; place-items: center; color: #fff; font-size: 15px; box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 6px 18px rgba(47,129,247,.35); }
+      .brand small { font-weight: 500; color: var(--muted); font-size: .74rem; letter-spacing: .02em; }
+      .hspace { flex: 1; }
+      .who { color: var(--muted); font-size: .82rem; }
+      .who b { color: var(--ink); font-weight: 600; }
+      .ghost { background: transparent; border: 1px solid var(--line2); color: var(--ink); border-radius: 8px; padding: .4rem .7rem; font-size: .82rem; }
+      .ghost:hover { border-color: var(--accent); }
+      .btn { border: 1px solid transparent; border-radius: 8px; padding: .5rem .9rem; font-size: .84rem; font-weight: 600; }
+      .btn.primary { background: var(--accent); color: #fff; }
+      .btn.primary:hover { background: #1f6feb; }
+      .btn.approve { background: var(--green); color: #04260d; }
+      .btn.approve:hover { filter: brightness(1.08); }
+      .btn.reject { background: transparent; color: var(--red); border-color: #5c2321; }
+      .btn.reject:hover { background: rgba(248,81,73,.1); }
+      .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+      .layout { display: grid; grid-template-columns: 380px 1fr; gap: 0; height: calc(100dvh - 57px); }
+      @media (max-width: 900px) { .layout { grid-template-columns: 1fr; height: auto; } .detail { border-left: none !important; } .queue { max-height: none !important; } }
+      .queue { border-right: 1px solid var(--line); overflow-y: auto; background: var(--bg2); }
+      .queue .qhead { display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.1rem .6rem; position: sticky; top: 0; background: var(--bg2); z-index: 5; }
+      .qhead h2 { margin: 0; font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+      .kpis { display: flex; gap: .5rem; padding: 0 1.1rem .7rem; }
+      .kpi { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: .5rem .6rem; }
+      .kpi .n { font-size: 1.25rem; font-weight: 800; line-height: 1; font-family: var(--mono); }
+      .kpi .l { font-size: .62rem; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); margin-top: .3rem; }
+
+      .prcard { display: block; width: 100%; text-align: left; background: transparent; border: none; border-bottom: 1px solid var(--line);
+        padding: .85rem 1.1rem; display: grid; grid-template-columns: 46px 1fr auto; gap: .8rem; align-items: center; color: inherit; }
+      .prcard:hover { background: #0f1620; }
+      .prcard.sel { background: #0f1a2b; box-shadow: inset 3px 0 0 var(--accent); }
+      .scoreb { width: 46px; height: 46px; border-radius: 11px; display: grid; place-items: center; font-family: var(--mono);
+        font-weight: 700; font-size: 1.05rem; border: 1.5px solid; }
+      .scoreb.g { color: var(--green); border-color: rgba(63,185,80,.5); background: rgba(63,185,80,.09); }
+      .scoreb.a { color: var(--amber); border-color: rgba(210,153,34,.5); background: rgba(210,153,34,.09); }
+      .scoreb.r { color: var(--red); border-color: rgba(248,81,73,.5); background: rgba(248,81,73,.09); }
+      .scoreb.n { color: var(--dim); border-color: var(--line2); background: transparent; font-size: .8rem; }
+      .prmeta .t { font-weight: 600; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+      .prmeta .s { color: var(--muted); font-size: .74rem; margin-top: .2rem; }
+      .prmeta .s .mono { color: var(--dim); }
+      .prright { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; }
+      .crit { font-size: .68rem; font-family: var(--mono); color: var(--red); background: rgba(248,81,73,.12); border: 1px solid rgba(248,81,73,.3); border-radius: 6px; padding: .1rem .35rem; }
+
+      .badge { font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: .2rem .45rem; border-radius: 6px; white-space: nowrap; border: 1px solid; }
+      .badge.submitted { color: #a5d6ff; background: rgba(56,139,253,.12); border-color: rgba(56,139,253,.35); }
+      .badge.evaluating { color: #d2a8ff; background: rgba(163,113,247,.12); border-color: rgba(163,113,247,.35); }
+      .badge.needs_fixes { color: #ffb4ab; background: rgba(248,81,73,.12); border-color: rgba(248,81,73,.35); }
+      .badge.ready_for_signoff { color: #7ee787; background: rgba(63,185,80,.12); border-color: rgba(63,185,80,.35); }
+      .badge.approved { color: #04260d; background: var(--green); border-color: var(--green); }
+      .badge.regressed { color: #ffdf5d; background: rgba(210,153,34,.15); border-color: rgba(210,153,34,.5); }
+
+      .detail { overflow-y: auto; padding: clamp(1rem, 2.5vw, 1.9rem); background: var(--bg); }
+      .empty { height: 100%; display: grid; place-items: center; text-align: center; color: var(--dim); }
+      .empty .big { font-size: 2.4rem; margin-bottom: .5rem; }
+
+      .dhead { display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+      .dhead .grow { flex: 1; min-width: 220px; }
+      .dhead h1 { margin: 0; font-size: 1.4rem; letter-spacing: -.02em; }
+      .dhead .repo { color: var(--muted); font-size: .82rem; margin-top: .25rem; }
+      .dhead .repo b { color: var(--ink); }
+      .gauge { display: flex; align-items: center; gap: 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 1rem 1.2rem; }
+      .gauge .num { font-family: var(--mono); font-weight: 800; font-size: 2.6rem; line-height: 1; }
+      .gauge .of { color: var(--dim); font-size: .8rem; font-family: var(--mono); }
+      .gauge .lab { font-size: .68rem; text-transform: uppercase; letter-spacing: .09em; color: var(--dim); margin-top: .35rem; }
+
+      .gate { margin: 1.1rem 0; border-radius: 14px; padding: .85rem 1.1rem; display: flex; align-items: center; gap: .7rem; font-weight: 600; border: 1px solid; }
+      .gate.block { background: rgba(248,81,73,.08); border-color: rgba(248,81,73,.35); color: #ffb4ab; }
+      .gate.pass { background: rgba(63,185,80,.08); border-color: rgba(63,185,80,.35); color: #7ee787; }
+      .gate.approved { background: rgba(63,185,80,.12); border-color: rgba(63,185,80,.45); color: #7ee787; }
+      .gate .ico { font-size: 1.2rem; }
+      .gate small { display: block; font-weight: 400; color: var(--muted); font-size: .78rem; margin-top: .1rem; }
+
+      .actions { display: flex; gap: .6rem; margin: 1rem 0 1.4rem; flex-wrap: wrap; }
+      .section { margin-top: 1.5rem; }
+      .section > h3 { font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin: 0 0 .7rem; display: flex; align-items: center; gap: .5rem; }
+      .section > h3 .count { color: var(--muted); font-family: var(--mono); font-weight: 500; }
+
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: .8rem .95rem; margin-bottom: .55rem; }
+      .chk { display: grid; grid-template-columns: 20px 1fr; gap: .7rem; }
+      .chk .mk { font-family: var(--mono); font-weight: 700; text-align: center; }
+      .chk.pass .mk { color: var(--green); }
+      .chk.fail .mk { color: var(--red); }
+      .chk.na .mk { color: var(--dim); }
+      .chk .lab { font-weight: 600; }
+      .chk .ev { color: var(--muted); font-size: .82rem; margin-top: .15rem; font-family: var(--mono); word-break: break-word; }
+      .chk .key { color: var(--dim); font-size: .68rem; font-family: var(--mono); }
+
+      .flag { border-left: 3px solid; }
+      .flag.critical { border-color: var(--crit); } .flag.serious { border-color: var(--serious); }
+      .flag.moderate { border-color: var(--moderate); } .flag.minor { border-color: var(--minor); }
+      .flag .top { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+      .sev { font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .12rem .4rem; border-radius: 5px; }
+      .sev.critical { color: #fff; background: var(--crit); } .sev.serious { color: #fff; background: var(--serious); }
+      .sev.moderate { color: #04260d; background: var(--moderate); } .sev.minor { color: var(--ink); background: var(--line2); }
+      .cat { font-size: .68rem; font-family: var(--mono); color: var(--muted); }
+      .src { margin-left: auto; font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); border: 1px solid var(--line2); border-radius: 5px; padding: .08rem .35rem; }
+      .flag .desc { margin-top: .4rem; font-size: .88rem; }
+      .flag .ev { color: var(--muted); font-size: .8rem; margin-top: .35rem; font-family: var(--mono); word-break: break-word; }
+
+      .md { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.2rem; white-space: pre-wrap; font-size: .86rem; }
+      .md.mono { font-family: var(--mono); font-size: .8rem; line-height: 1.6; }
+      .audit { background: linear-gradient(180deg, rgba(63,185,80,.06), transparent), var(--panel); border: 1px solid rgba(63,185,80,.3); border-radius: 14px; padding: 1.1rem 1.3rem; }
+      .audit .row { display: flex; justify-content: space-between; padding: .35rem 0; border-bottom: 1px dashed var(--line); font-size: .86rem; }
+      .audit .row:last-child { border-bottom: none; }
+      .audit .row .k { color: var(--muted); }
+      .audit .row .v { font-family: var(--mono); font-weight: 600; }
+      .seal { display: inline-flex; align-items: center; gap: .4rem; color: var(--green); font-weight: 700; font-size: .8rem; letter-spacing: .04em; }
+
+      .dimbar { display: grid; grid-template-columns: 130px 1fr 52px; gap: .6rem; align-items: center; margin-bottom: .5rem; font-size: .8rem; }
+      .dimbar .track { height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; }
+      .dimbar .fill { height: 100%; background: linear-gradient(90deg, #1f6feb, var(--green)); border-radius: 999px; }
+      .dimbar .val { text-align: right; font-family: var(--mono); color: var(--muted); }
+      .dimbar .nm { color: var(--muted); }
+
+      .toast { position: fixed; bottom: 1.2rem; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line2);
+        color: var(--ink); padding: .7rem 1.1rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 100; font-size: .86rem; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
+      .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+      .modal { position: fixed; inset: 0; background: rgba(1,4,9,.7); display: grid; place-items: center; z-index: 60; padding: 1rem; }
+      .sheet { background: var(--panel); border: 1px solid var(--line2); border-radius: 16px; padding: 1.4rem; width: min(640px, 100%); max-height: 90dvh; overflow: auto; }
+      .sheet h2 { margin: 0 0 .3rem; font-size: 1.15rem; }
+      .sheet p.cap { margin: 0 0 1rem; color: var(--muted); font-size: .84rem; }
+      .field { margin-bottom: .8rem; } .field label { display: block; font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: .3rem; }
+      .field input, .field textarea { width: 100%; background: var(--bg2); border: 1px solid var(--line2); border-radius: 9px; color: var(--ink); padding: .6rem .7rem; font: inherit; }
+      .field textarea { min-height: 150px; font-family: var(--mono); font-size: .8rem; resize: vertical; }
+      .field .two { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+      .sheet .foot { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
+      .center { min-height: 100dvh; display: grid; place-items: center; text-align: center; }
+      .spin { width: 16px; height: 16px; border: 2px solid var(--line2); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: sp .7s linear infinite; vertical-align: -3px; }
+      @keyframes sp { to { transform: rotate(360deg); } }
+      .muted { color: var(--muted); } .dim { color: var(--dim); }
+    </style>
+  </head>
+  <body>
+    <div id="app"><div class="center"><div><span class="spin"></span> <span class="muted">Loading ShipGate…</span></div></div></div>
+    <div id="toast" class="toast"></div>
+
+    <script>
+      (function () {
+        var cfg = window.__LEMMA_CONFIG__ || {};
+        var base = (cfg.apiUrl || window.location.origin).replace(/\/$/, "");
+        var s = document.createElement("script");
+        s.src = base + "/public/sdk/lemma-client.js";
+        var sdkTimer = setTimeout(function () {
+          if (!(window.LemmaClient && window.LemmaClient.LemmaClient)) {
+            diag("The Lemma SDK did not load from " + s.src + " within 12s (network / ad-blocker?).");
+          }
+        }, 12000);
+        s.onload = function () { clearTimeout(sdkTimer); boot(); };
+        s.onerror = function () { clearTimeout(sdkTimer); diag("Couldn't load the Lemma SDK from " + s.src); };
+        document.head.appendChild(s);
+      })();
+
+      var CFG = window.__LEMMA_CONFIG__ || {};
+      var API = (CFG.apiUrl || window.location.origin).replace(/\/$/, "");
+      var POD = CFG.podId;
+      var client, USER = null;
+      var STATE = { prs: [], checks: [], flags: [], signoffs: [], notes: [], sel: null };
+      var busy = {}; // pr_id -> true while evaluating/acting
+
+      function $(id) { return document.getElementById(id); }
+      function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+      function fatal(m) { $("app").innerHTML = '<div class="center"><div><div style="font-size:2rem">⚠</div><p class="muted">' + esc(m) + "</p></div></div>"; }
+      function tok() { try { return localStorage.getItem("lemma_token"); } catch (e) { return null; } }
+      function toast(m) { var t = $("toast"); t.innerHTML = m; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove("show"); }, 3200); }
+
+      // REST for actions (workflow trigger + function runs) — SDK for reads.
+      async function api(path, body) {
+        var r = await fetch(API + path, { method: "POST", headers: { Authorization: "Bearer " + tok(), "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+        if (!r.ok) throw new Error("HTTP " + r.status + " on " + path);
+        return r.json();
+      }
+      async function runFn(name, input) { return api("/pods/" + POD + "/functions/" + name + "/runs", { input_data: input }); }
+
+      var LAST = "start";
+      function setLoading(msg) { var a = $("app"); if (a) a.innerHTML = '<div class="center"><div><span class="spin"></span> <span class="muted">' + esc(msg) + "</span></div></div>"; }
+      function diag(msg) {
+        $("app").innerHTML = '<div class="center"><div style="max-width:34rem"><div style="font-size:1.6rem;margin-bottom:.4rem">⚠</div>' +
+          '<p class="muted">' + esc(msg) + '</p>' +
+          '<p class="dim" style="font-size:.8rem">last step: ' + esc(LAST) + ' · token: ' + (tok() ? "present" : "missing") + ' · pod: ' + esc(POD || "none") + ' · api: ' + esc(API) + '</p>' +
+          '<div style="margin-top:1rem;display:flex;gap:.6rem;justify-content:center">' +
+          '<button class="btn primary" onclick="location.reload()">Reload</button>' +
+          '<button class="ghost" id="d_signin">Sign in again</button></div></div></div>';
+        var b = $("d_signin"); if (b) b.onclick = function () { try { client.auth.redirectToAuth(); } catch (e) { location.reload(); } };
+      }
+      function withTimeout(p, ms, label) {
+        return Promise.race([p, new Promise(function (_, rej) { setTimeout(function () { rej(new Error("timed out at: " + label)); }, ms); })]);
+      }
+
+      async function boot() {
+        var watchdog = setTimeout(function () { diag("Still loading after 20s — something stalled."); }, 20000);
+        try {
+          LAST = "construct client"; setLoading("Connecting to pod…");
+          client = new window.LemmaClient.LemmaClient();
+          LAST = "initialize/auth"; setLoading("Authenticating…");
+          var haveToken = !!tok() || /access_token/.test(location.hash || "");
+          var auth;
+          try { auth = await withTimeout(client.initialize(), 10000, "initialize"); }
+          catch (e) {
+            clearTimeout(watchdog);
+            if (!haveToken && client.auth && client.auth.redirectToAuth) return client.auth.redirectToAuth();
+            return diag("Auth check stalled: " + e.message);
+          }
+          if (!auth || auth.status !== "authenticated") {
+            clearTimeout(watchdog);
+            if (client.auth && client.auth.redirectToAuth) return client.auth.redirectToAuth();
+            return signIn();
+          }
+          USER = auth.user || {};
+          LAST = "load records"; setLoading("Loading pull requests…");
+          await withTimeout(load(), 20000, "load records");
+          clearTimeout(watchdog);
+          render();
+          startLive();
+        } catch (e) { clearTimeout(watchdog); diag((e && e.message) || String(e)); }
+      }
+      function signIn() {
+        $("app").innerHTML = '<div class="center"><div><div class="brand" style="justify-content:center"><span class="logo">⎈</span> ShipGate</div>' +
+          '<p class="muted" style="margin:.8rem 0 1.1rem">The release-readiness gate for pull requests.</p>' +
+          '<button class="btn primary" id="si">Sign in</button></div></div>';
+        $("si").onclick = function () { client.auth.redirectToAuth(); };
+      }
+
+      function items(resp) { return (resp && resp.items) || (Array.isArray(resp) ? resp : []); }
+      async function listAll(table) {
+        try { return items(await client.records.list(table, { limit: 500 })); } catch (e) { return []; }
+      }
+      async function load() {
+        var r = await Promise.all([
+          listAll("pull_requests"), listAll("checklist_results"), listAll("risk_flags"),
+          listAll("sign_offs"), listAll("release_notes"),
+        ]);
+        STATE.prs = r[0].sort(function (a, b) { return String(b.created_at || "").localeCompare(String(a.created_at || "")); });
+        STATE.checks = r[1]; STATE.flags = r[2]; STATE.signoffs = r[3]; STATE.notes = r[4];
+        if (!STATE.sel && STATE.prs.length) STATE.sel = STATE.prs[0].id;
+        if (STATE.sel && !STATE.prs.some(function (p) { return p.id === STATE.sel; })) STATE.sel = STATE.prs.length ? STATE.prs[0].id : null;
+      }
+
+      var CHECK_ORDER = ["migration_reversible", "tests_for_new_code", "changelog_updated", "docs_updated", "version_bumped", "no_secrets", "no_debug_leftovers"];
+      function forPr(arr, id) { return arr.filter(function (r) { return r.pr_id === id; }); }
+      function openFlags(id) { return forPr(STATE.flags, id).filter(function (f) { return f.status !== "resolved"; }); }
+      function openCriticals(id) { return openFlags(id).filter(function (f) { return f.severity === "critical"; }).length; }
+      function scoreClass(s) { if (s == null) return "n"; if (s >= 70) return "g"; if (s >= 60) return "a"; return "r"; }
+      function latestSignoff(id) { var s = forPr(STATE.signoffs, id).sort(function (a, b) { return String(b.decided_at || b.created_at || "").localeCompare(String(a.decided_at || a.created_at || "")); }); return s[0] || null; }
+      function noteFor(id) { var n = forPr(STATE.notes, id).sort(function (a, b) { return String(b.created_at || "").localeCompare(String(a.created_at || "")); }); return n[0] || null; }
+
+      /* ---------- render ---------- */
+      function render() {
+        var prs = STATE.prs;
+        var blocked = prs.filter(function (p) { return p.status === "needs_fixes" || p.status === "regressed"; }).length;
+        var waiting = prs.filter(function (p) { return p.status === "ready_for_signoff"; }).length;
+        var shipped = prs.filter(function (p) { return p.status === "approved"; }).length;
+
+        var html = '<header><div class="brand"><span class="logo">⎈</span> ShipGate <small>release-readiness gate</small></div>' +
+          '<div class="hspace"></div>' +
+          '<div class="who">signed in as <b>' + esc(USER.email || USER.name || "you") + "</b></div>" +
+          '<button class="btn primary" id="newpr">+ Submit PR</button>' +
+          '<button class="ghost" id="signout">Sign out</button></header>';
+
+        html += '<div class="layout"><aside class="queue"><div class="qhead"><h2>Pull requests</h2><span class="dim mono">' + prs.length + "</span></div>" +
+          '<div class="kpis">' +
+          kpi(blocked, "blocked", "var(--red)") + kpi(waiting, "awaiting sign-off", "var(--green)") + kpi(shipped, "shipped", "var(--accent)") + "</div>";
+
+        if (!prs.length) {
+          html += '<div style="padding:2rem 1.1rem;text-align:center" class="muted">No PRs yet.<br/>Click <b>Submit PR</b> to gate one.</div>';
+        } else {
+          html += prs.map(prCard).join("");
+        }
+        html += "</aside>";
+
+        html += '<main class="detail" id="detail">' + detailHTML(STATE.sel) + "</main></div>";
+        $("app").innerHTML = html;
+
+        $("newpr").onclick = openSubmit;
+        $("signout").onclick = function () { client.auth.signOut().then(function () { location.reload(); }); };
+        Array.prototype.forEach.call(document.querySelectorAll("[data-pr]"), function (el) { el.onclick = function () { STATE.sel = el.getAttribute("data-pr"); render(); }; });
+        wireDetail();
+      }
+      function kpi(n, l, c) { return '<div class="kpi"><div class="n" style="color:' + c + '">' + n + '</div><div class="l">' + l + "</div></div>"; }
+
+      function prCard(p) {
+        var sc = p.readiness_score, cls = scoreClass(sc);
+        var crit = openCriticals(p.id);
+        var ev = busy[p.id] || p.status === "evaluating";
+        return '<button class="prcard' + (p.id === STATE.sel ? " sel" : "") + '" data-pr="' + esc(p.id) + '">' +
+          '<div class="scoreb ' + cls + '">' + (ev ? '<span class="spin"></span>' : (sc == null ? "–" : sc)) + "</div>" +
+          '<div class="prmeta"><div class="t">' + esc(p.title) + "</div>" +
+          '<div class="s"><span class="mono">' + esc(p.repo) + " #" + esc(p.pr_number) + "</span> · " + esc(p.owner || "unknown") + "</div></div>" +
+          '<div class="prright">' + statusBadge(p.status) + (crit ? '<span class="crit">' + crit + " crit</span>" : "") + "</div></button>";
+      }
+      function statusBadge(s) { return '<span class="badge ' + esc(s) + '">' + esc(String(s || "").replace(/_/g, " ")) + "</span>"; }
+
+      function detailHTML(id) {
+        if (!id) return '<div class="empty"><div><div class="big">⎈</div>Select a pull request to see its readiness gate.</div></div>';
+        var p = STATE.prs.filter(function (x) { return x.id === id; })[0];
+        if (!p) return '<div class="empty">Not found.</div>';
+        var sc = p.readiness_score, cls = scoreClass(sc);
+        var crit = openCriticals(id);
+        var checks = forPr(STATE.checks, id).sort(function (a, b) { return CHECK_ORDER.indexOf(a.check_key) - CHECK_ORDER.indexOf(b.check_key); });
+        var flags = openFlags(id).sort(function (a, b) { return sevRank(a.severity) - sevRank(b.severity); });
+        var note = noteFor(id), so = latestSignoff(id);
+        var evaluating = busy[id] || p.status === "evaluating";
+
+        var h = '<div class="dhead"><div class="grow"><h1>' + esc(p.title) + "</h1>" +
+          '<div class="repo"><span class="mono">' + esc(p.repo) + " #" + esc(p.pr_number) + '</span> · owner <b>' + esc(p.owner || "unknown") + "</b> · " + statusBadge(p.status) + "</div></div>" +
+          '<div class="gauge"><div><span class="num" style="color:var(--' + (cls === "g" ? "green" : cls === "a" ? "amber" : cls === "r" ? "red" : "dim") + ')">' +
+          (evaluating ? '<span class="spin"></span>' : (sc == null ? "–" : sc)) + '</span><span class="of"> / 100</span><div class="lab">readiness score</div></div></div></div>';
+
+        // gate banner
+        if (p.status === "approved") {
+          h += '<div class="gate approved"><span class="ico">✓</span><div>Approved for release<small>Signed off and recorded. Release notes are final.</small></div></div>';
+        } else if (evaluating) {
+          h += '<div class="gate pass"><span class="ico"><span class="spin"></span></span><div>Evaluating…<small>Running deterministic checks, then the review agent.</small></div></div>';
+        } else if (p.status === "ready_for_signoff") {
+          h += '<div class="gate pass"><span class="ico">▲</span><div>Passed the gate — ready for sign-off<small>Score ≥ 70 and no open criticals. A human decision is required to release.</small></div></div>';
+        } else if (p.status === "regressed") {
+          h += '<div class="gate block"><span class="ico">↺</span><div>Regressed<small>A previously-approved PR now fails the gate. ' + crit + ' open critical risk(s).</small></div></div>';
+        } else if (p.status === "needs_fixes") {
+          h += '<div class="gate block"><span class="ico">✕</span><div>Blocked by the gate<small>' + (sc != null && sc < 70 ? "Score " + sc + " &lt; 70" : "Below the bar") + (crit ? " · " + crit + " open critical risk(s)" : "") + ". Fix and re-run.</small></div></div>';
+        } else {
+          h += '<div class="gate pass"><span class="ico">•</span><div>Submitted<small>Not evaluated yet.</small></div></div>';
+        }
+
+        // actions
+        h += '<div class="actions">';
+        if (p.status === "ready_for_signoff") {
+          h += '<button class="btn approve" data-approve="' + esc(id) + '">✓ Approve for release</button>' +
+               '<button class="btn reject" data-reject="' + esc(id) + '">Request changes</button>';
+        }
+        h += '<button class="ghost" data-eval="' + esc(id) + '"' + (evaluating ? " disabled" : "") + '>' + (evaluating ? "Evaluating…" : "↻ Re-evaluate") + "</button>";
+        h += '<button class="ghost" data-diff="' + esc(id) + '">✎ Edit diff</button>';
+        h += "</div>";
+
+        // audit record (approved)
+        if (so && so.decision === "approved") {
+          h += '<div class="section"><h3>Signed audit record</h3><div class="audit">' +
+            '<div class="seal">✓ RELEASE APPROVED</div>' +
+            '<div class="row"><span class="k">Approver</span><span class="v">' + esc(so.approver) + "</span></div>" +
+            '<div class="row"><span class="k">Decided at</span><span class="v">' + esc(fmt(so.decided_at || so.created_at)) + "</span></div>" +
+            '<div class="row"><span class="k">Score at sign-off</span><span class="v">' + esc(so.score_at_signoff) + " / 100</span></div>" +
+            '<div class="row"><span class="k">Open criticals at sign-off</span><span class="v">' + esc(so.open_criticals) + "</span></div>" +
+            (so.note ? '<div class="row"><span class="k">Note</span><span class="v">' + esc(so.note) + "</span></div>" : "") + "</div></div>";
+        } else if (so && so.decision === "changes_requested") {
+          h += '<div class="section"><h3>Last decision</h3><div class="card"><b class="muted">Changes requested</b> by <span class="mono">' + esc(so.approver) + "</span> · " + esc(fmt(so.decided_at || so.created_at)) + (so.note ? '<div class="ev muted mono" style="margin-top:.4rem">' + esc(so.note) + "</div>" : "") + "</div></div>";
+        }
+
+        // score breakdown
+        h += scoreBreakdown(id, flags);
+
+        // checklist
+        h += '<div class="section"><h3>Deterministic checklist <span class="count">' + checks.length + " checks</span></h3>";
+        h += checks.length ? checks.map(chkCard).join("") : '<div class="card muted">Not run yet.</div>';
+        h += "</div>";
+
+        // risk flags
+        h += '<div class="section"><h3>Risk flags <span class="count">' + flags.length + " open</span></h3>";
+        h += flags.length ? flags.map(flagCard).join("") : '<div class="card muted">No open risks.</div>';
+        h += "</div>";
+
+        // test plan
+        h += '<div class="section"><h3>Test plan <span class="count">agent</span></h3>';
+        h += p.test_plan ? '<div class="md mono">' + esc(p.test_plan) + "</div>" : '<div class="card muted">The review agent writes this during evaluation.</div>';
+        h += "</div>";
+
+        // release notes
+        h += '<div class="section"><h3>Release notes ' + (p.status === "approved" ? '<span class="count">final</span>' : '<span class="count">draft</span>') + "</h3>";
+        h += note && note.content ? '<div class="md">' + esc(note.content) + "</div>" : '<div class="card muted">Drafted by the agent during evaluation.</div>';
+        h += "</div>";
+
+        return h;
+      }
+      function sevRank(s) { return { critical: 0, serious: 1, moderate: 2, minor: 3 }[s] != null ? { critical: 0, serious: 1, moderate: 2, minor: 3 }[s] : 4; }
+
+      function chkCard(c) {
+        var mk = c.result === "pass" ? "✓" : c.result === "fail" ? "✕" : "–";
+        return '<div class="card chk ' + esc(c.result) + '"><div class="mk">' + mk + "</div><div>" +
+          '<div class="lab">' + esc(c.label) + ' <span class="key">' + esc(c.check_key) + "</span></div>" +
+          '<div class="ev">' + esc(c.evidence) + "</div></div></div>";
+      }
+      function flagCard(f) {
+        return '<div class="card flag ' + esc(f.severity) + '"><div class="top"><span class="sev ' + esc(f.severity) + '">' + esc(f.severity) + "</span>" +
+          '<span class="cat">' + esc(f.category) + '</span><span class="src">' + esc(f.source) + "</span></div>" +
+          '<div class="desc">' + esc(f.description) + "</div>" +
+          (f.evidence ? '<div class="ev">▸ ' + esc(f.evidence) + "</div>" : "") + "</div>";
+      }
+
+      var DIMS = [["correctness", 30], ["tests", 20], ["migration", 15], ["breaking", 15], ["docs", 12], ["claim_gap", 8]];
+      var SEVPCT = { critical: 1, serious: 0.6, moderate: 0.3, minor: 0.1 };
+      var CAT2DIM = { correctness: "correctness", tests: "tests", migration: "migration", breaking: "breaking", docs: "docs", claim_gap: "claim_gap", security: "correctness" };
+      function scoreBreakdown(id, flags) {
+        var rem = {}; DIMS.forEach(function (d) { rem[d[0]] = d[1]; });
+        flags.forEach(function (f) { var dim = CAT2DIM[f.category]; if (!dim) return; var pen = DIMS.filter(function (d) { return d[0] === dim; })[0][1] * (SEVPCT[f.severity] || 0); rem[dim] = Math.max(0, rem[dim] - pen); });
+        var rows = DIMS.map(function (d) {
+          var pct = (rem[d[0]] / d[1]) * 100;
+          return '<div class="dimbar"><span class="nm">' + d[0].replace("_", " ") + '</span><div class="track"><div class="fill" style="width:' + pct + '%"></div></div>' +
+            '<span class="val">' + (Math.round(rem[d[0]] * 10) / 10) + "/" + d[1] + "</span></div>";
+        }).join("");
+        return '<div class="section"><h3>Score breakdown <span class="count">6 weighted dimensions → 100</span></h3><div class="card">' + rows + '</div></div>';
+      }
+
+      function fmt(s) { if (!s) return "—"; try { return new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); } catch (e) { return s; } }
+
+      /* ---------- actions ---------- */
+      function wireDetail() {
+        Array.prototype.forEach.call(document.querySelectorAll("[data-eval]"), function (b) { b.onclick = function () { evaluate(b.getAttribute("data-eval")); }; });
+        Array.prototype.forEach.call(document.querySelectorAll("[data-approve]"), function (b) { b.onclick = function () { signoff(b.getAttribute("data-approve"), "approved"); }; });
+        Array.prototype.forEach.call(document.querySelectorAll("[data-reject]"), function (b) { b.onclick = function () { signoff(b.getAttribute("data-reject"), "changes_requested"); }; });
+        Array.prototype.forEach.call(document.querySelectorAll("[data-diff]"), function (b) { b.onclick = function () { openEditDiff(b.getAttribute("data-diff")); }; });
+      }
+
+      async function evaluate(id) {
+        if (busy[id]) return;
+        busy[id] = true; render();
+        toast('<span class="spin"></span> Evaluating — deterministic checks, then the review agent…');
+        try {
+          var run = await api("/pods/" + POD + "/workflows/evaluate-and-gate/runs", {});
+          // fire the intake form; the workflow continues server-side
+          api("/pods/" + POD + "/workflow-runs/" + run.id + "/form", { node_id: "intake", inputs: { pr_id: id } }).catch(function () {});
+        } catch (e) { toast("⚠ " + e.message); busy[id] = false; render(); return; }
+        pollUntilDone(id);
+      }
+
+      function pollUntilDone(id) {
+        var tries = 0;
+        var iv = setInterval(async function () {
+          tries++;
+          await load();
+          var p = STATE.prs.filter(function (x) { return x.id === id; })[0];
+          renderIfCurrent(id);
+          if (!p) { clearInterval(iv); return; }
+          if (p.status !== "evaluating" && p.status !== "submitted") { clearInterval(iv); busy[id] = false; render(); toast("✓ Evaluation complete — score " + (p.readiness_score == null ? "?" : p.readiness_score) + ", " + String(p.status).replace(/_/g, " ")); }
+          if (tries > 60) { clearInterval(iv); busy[id] = false; render(); }
+        }, 4000);
+      }
+      function renderIfCurrent(id) { if (STATE.sel === id) { $("detail").innerHTML = detailHTML(id); wireDetail(); } var q = document.querySelector('[data-pr="' + id + '"]'); }
+
+      async function signoff(id, decision) {
+        var note = "";
+        if (decision === "changes_requested") { note = prompt("Reason for requesting changes (optional):") || ""; }
+        else { note = prompt("Sign-off note (optional):") || ""; }
+        busy[id] = true; render();
+        try {
+          await runFn("record_signoff", { pr_id: id, decision: decision, approver: (USER.email || USER.name || "unknown"), note: note });
+          await load(); busy[id] = false; render();
+          toast(decision === "approved" ? "✓ Approved & audit record written" : "Changes requested — sent back to fixes");
+        } catch (e) { busy[id] = false; render(); toast("⚠ " + e.message); }
+      }
+
+      /* ---------- submit / edit ---------- */
+      function modal(inner) {
+        var m = document.createElement("div"); m.className = "modal"; m.innerHTML = '<div class="sheet">' + inner + "</div>";
+        m.onclick = function (e) { if (e.target === m) document.body.removeChild(m); };
+        document.body.appendChild(m); return m;
+      }
+      function openSubmit() {
+        var m = modal(
+          "<h2>Submit a pull request</h2><p class=\"cap\">Paste a unified diff. ShipGate runs the deterministic checklist, the review agent, scores it, and gates it.</p>" +
+          '<div class="field two"><div><label>Repo</label><input id="f_repo" placeholder="acme/checkout"/></div><div><label>PR number</label><input id="f_num" type="number" placeholder="482"/></div></div>' +
+          '<div class="field"><label>Title</label><input id="f_title" placeholder="Add coupon endpoint"/></div>' +
+          '<div class="field"><label>Description (what the PR claims)</label><textarea id="f_desc" style="min-height:70px" placeholder="Adds a /coupons endpoint with caching…"></textarea></div>' +
+          '<div class="field"><label>Owner</label><input id="f_owner" placeholder="you@team.dev"/></div>' +
+          '<div class="field"><label>Unified diff</label><textarea id="f_diff" placeholder="diff --git a/... b/..."></textarea></div>' +
+          '<div class="foot"><button class="ghost" id="c_cancel">Cancel</button><button class="btn primary" id="c_go">Submit & evaluate</button></div>'
+        );
+        $("f_owner").value = USER.email || "";
+        $("c_cancel").onclick = function () { document.body.removeChild(m); };
+        $("c_go").onclick = async function () {
+          var rec = { repo: $("f_repo").value || "local/repo", pr_number: parseInt($("f_num").value || "0", 10) || 0,
+            title: $("f_title").value || "Untitled PR", description: $("f_desc").value || "", owner: $("f_owner").value || (USER.email || "unknown"),
+            diff: $("f_diff").value || "", status: "submitted", submitted_at: new Date().toISOString() };
+          $("c_go").disabled = true; $("c_go").innerHTML = '<span class="spin"></span> creating…';
+          try {
+            var created = await client.records.create("pull_requests", rec);
+            var id = created.id || (created.data && created.data.id);
+            document.body.removeChild(m);
+            await load(); STATE.sel = id; render();
+            evaluate(id);
+          } catch (e) { $("c_go").disabled = false; $("c_go").textContent = "Submit & evaluate"; toast("⚠ " + e.message); }
+        };
+      }
+      function openEditDiff(id) {
+        var p = STATE.prs.filter(function (x) { return x.id === id; })[0]; if (!p) return;
+        var m = modal(
+          "<h2>Edit diff & description</h2><p class=\"cap\">Update the PR, then re-run the gate — this is how a fix (or a regression) is caught.</p>" +
+          '<div class="field"><label>Description</label><textarea id="e_desc" style="min-height:70px">' + esc(p.description || "") + "</textarea></div>" +
+          '<div class="field"><label>Unified diff</label><textarea id="e_diff">' + esc(p.diff || "") + "</textarea></div>" +
+          '<div class="foot"><button class="ghost" id="e_cancel">Cancel</button><button class="btn primary" id="e_go">Save & re-evaluate</button></div>'
+        );
+        $("e_cancel").onclick = function () { document.body.removeChild(m); };
+        $("e_go").onclick = async function () {
+          $("e_go").disabled = true; $("e_go").innerHTML = '<span class="spin"></span> saving…';
+          try {
+            await client.records.update("pull_requests", id, { description: $("e_desc").value, diff: $("e_diff").value });
+            document.body.removeChild(m); await load(); render(); evaluate(id);
+          } catch (e) { $("e_go").disabled = false; $("e_go").textContent = "Save & re-evaluate"; toast("⚠ " + e.message); }
+        };
+      }
+
+      /* ---------- live refresh ---------- */
+      function startLive() {
+        try {
+          client.datastore.watchChanges({ onChange: function () { load().then(function () { if (!Object.keys(busy).length) render(); }); } });
+        } catch (e) { /* fallback: gentle periodic refresh */
+          setInterval(function () { if (!Object.keys(busy).length) load().then(render); }, 8000);
+        }
+      }
+    </script>
+  </body>
+</html>

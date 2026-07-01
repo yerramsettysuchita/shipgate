@@ -1,0 +1,4 @@
+{
+  "name": "shipgate",
+  "description": "Release-readiness gate for pull requests: deterministic checks + a review agent produce a 0-100 readiness score, block or send to human sign-off, generate release notes and a signed audit record, and re-run to catch regressions."
+}

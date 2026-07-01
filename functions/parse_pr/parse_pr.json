@@ -1,0 +1,8 @@
+{
+  "name": "parse_pr",
+  "description": "Deterministically parse a PR unified diff: changed files, added/removed lines, migration/test/changelog/version/docs files, new endpoints, secrets and debug leftovers. Pure, no LLM.",
+  "type": "API",
+  "visibility": "POD",
+  "code": { "$file": "code.py" },
+  "permissions": { "grants": [] }
+}

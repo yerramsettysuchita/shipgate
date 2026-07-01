@@ -1,0 +1,19 @@
+{
+  "name": "pull_requests",
+  "primary_key_column": "id",
+  "enable_rls": false,
+  "columns": [
+    { "name": "repo", "type": "TEXT", "required": true, "max_length": 240 },
+    { "name": "pr_number", "type": "INTEGER", "required": true },
+    { "name": "title", "type": "TEXT", "required": true, "max_length": 300 },
+    { "name": "description", "type": "TEXT" },
+    { "name": "diff", "type": "TEXT" },
+    { "name": "status", "type": "ENUM", "required": true, "default": "submitted",
+      "options": ["submitted", "evaluating", "needs_fixes", "ready_for_signoff", "approved", "regressed"] },
+    { "name": "readiness_score", "type": "INTEGER" },
+    { "name": "test_plan", "type": "TEXT", "description": "Agent-authored test plan for the edge cases this diff introduces (markdown)." },
+    { "name": "owner", "type": "TEXT", "max_length": 200 },
+    { "name": "submitted_at", "type": "DATETIME" }
+  ],
+  "config": {}
+}

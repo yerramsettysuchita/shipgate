@@ -1,0 +1,20 @@
+{
+  "name": "risk_flags",
+  "primary_key_column": "id",
+  "enable_rls": false,
+  "columns": [
+    { "name": "pr_id", "type": "UUID", "required": true,
+      "foreign_key": { "references": "pull_requests.id" } },
+    { "name": "category", "type": "ENUM", "required": true,
+      "options": ["correctness", "migration", "tests", "docs", "breaking", "security", "claim_gap"] },
+    { "name": "severity", "type": "ENUM", "required": true,
+      "options": ["critical", "serious", "moderate", "minor"] },
+    { "name": "description", "type": "TEXT", "required": true },
+    { "name": "evidence", "type": "TEXT", "description": "Exact file + hunk the risk is grounded in." },
+    { "name": "source", "type": "ENUM", "required": true, "default": "function",
+      "options": ["function", "agent"] },
+    { "name": "status", "type": "ENUM", "required": true, "default": "open",
+      "options": ["open", "resolved"] }
+  ],
+  "config": {}
+}

@@ -1,0 +1,39 @@
+{
+  "name": "release-reviewer",
+  "description": "Assesses whether a PR is safe to release: finds claim-vs-code gaps, correctness/broken-flow risks and breaking changes the deterministic checklist cannot, writes evidenced risk_flags, drafts a test plan, and drafts release notes.",
+  "instruction": { "$file": "instruction.md" },
+  "toolsets": ["POD"],
+  "visibility": "POD",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "pr_id": { "type": "string", "description": "pull_requests row id to review and write findings against" },
+      "title": { "type": "string" },
+      "description": { "type": "string" },
+      "diff": { "type": "string" }
+    },
+    "required": ["pr_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "risks_added": { "type": "integer", "description": "number of agent risk_flags written" },
+      "claim_gaps_found": { "type": "integer", "description": "number of claim-vs-code gaps found" },
+      "test_plan": { "type": "string", "description": "the test plan written to pull_requests.test_plan (markdown)" },
+      "summary": { "type": "string", "description": "one-paragraph reviewer summary" }
+    },
+    "required": ["risks_added", "claim_gaps_found", "summary"]
+  },
+  "permissions": { "grants": [
+    { "resource_type": "datastore_table", "resource_name": "pull_requests",
+      "permission_ids": ["datastore.table.read", "datastore.record.read", "datastore.record.write"] },
+    { "resource_type": "datastore_table", "resource_name": "checklist_results",
+      "permission_ids": ["datastore.table.read", "datastore.record.read"] },
+    { "resource_type": "datastore_table", "resource_name": "risk_flags",
+      "permission_ids": ["datastore.table.read", "datastore.record.read", "datastore.record.write"] },
+    { "resource_type": "datastore_table", "resource_name": "release_notes",
+      "permission_ids": ["datastore.table.read", "datastore.record.read", "datastore.record.write"] },
+    { "resource_type": "folder", "resource_name": "/knowledge",
+      "permission_ids": ["folder.read"] }
+  ] }
+}

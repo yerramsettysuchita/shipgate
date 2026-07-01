@@ -1,0 +1,8 @@
+{
+  "repo": "acme/checkout",
+  "pr_number": 482,
+  "title": "Add coupon endpoint with caching",
+  "description": "Add a POST /coupons endpoint backed by a new coupons table. Includes in-memory caching with retry and exponential backoff on coupon lookups to keep the hot path fast.",
+  "owner": "dana@acme.dev",
+  "diff": "diff --git a/api/coupons.py b/api/coupons.py\n--- a/dev/null\n+++ b/api/coupons.py\n@@\n+from fastapi import APIRouter\n+from db import get_session\n+\n+router = APIRouter()\n+\n+@router.post(\"/coupons\")\n+def create_coupon(code: str, pct: int):\n+    with get_session() as s:\n+        s.execute(\n+            \"insert into coupons (code, pct) values (:code, :pct)\",\n+            {\"code\": code, \"pct\": pct},\n+        )\n+        s.commit()\n+    return {\"code\": code, \"pct\": pct}\ndiff --git a/migrations/0007_add_coupons.sql b/migrations/0007_add_coupons.sql\n--- a/dev/null\n+++ b/migrations/0007_add_coupons.sql\n@@\n+CREATE TABLE coupons (\n+  id serial primary key,\n+  code text not null unique,\n+  pct int not null\n+);\n"
+}
