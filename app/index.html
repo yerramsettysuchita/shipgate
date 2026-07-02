@@ -47,7 +47,7 @@
 
       .layout { display: grid; grid-template-columns: 390px 1fr; height: calc(100dvh - 61px); }
       @media (max-width: 920px) { .layout { grid-template-columns: 1fr; height: auto; } .queue { max-height: none !important; border-right: none !important; } }
-      .queue { border-right: 1px solid var(--line); overflow-y: auto; background: var(--bg2); }
+      .queue { border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; background: var(--bg2); }
       .qhead { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.15rem .55rem; }
       .qhead h2 { margin: 0; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); font-weight: 700; }
       .kpis { display: flex; gap: .55rem; padding: 0 1.15rem .85rem; }
@@ -55,10 +55,11 @@
       .kpi .n { font-size: 1.35rem; font-weight: 800; line-height: 1; font-family: var(--mono); }
       .kpi .l { font-size: .64rem; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-top: .35rem; font-weight: 600; }
 
-      .prcard { display: grid; width: 100%; text-align: left; grid-template-columns: 50px 1fr auto; gap: .85rem; align-items: center; background: transparent; border: none; border-bottom: 1px solid var(--line); padding: .95rem 1.15rem; color: inherit; }
+      .prcard { display: grid; width: 100%; text-align: left; grid-template-columns: 46px minmax(0,1fr) auto; gap: .75rem; align-items: center; background: transparent; border: none; border-bottom: 1px solid var(--line); padding: .9rem 1.1rem; color: inherit; overflow: hidden; }
       .prcard:hover { background: var(--soft); }
       .prcard.sel { background: #eef3ff; box-shadow: inset 3px 0 0 var(--brand); }
-      .scoreb { width: 50px; height: 50px; border-radius: 13px; display: grid; place-items: center; font-family: var(--mono); font-weight: 800; font-size: 1.1rem; border: 1.5px solid; }
+      .prmeta { min-width: 0; }
+      .scoreb { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-family: var(--mono); font-weight: 800; font-size: 1.05rem; border: 1.5px solid; }
       .scoreb.g { color: var(--green); border-color: var(--greenln); background: var(--greenbg); }
       .scoreb.a { color: var(--amber); border-color: var(--amberln); background: var(--amberbg); }
       .scoreb.r { color: var(--red); border-color: var(--redln); background: var(--redbg); }
@@ -144,7 +145,7 @@
       .dimbar { display: grid; grid-template-columns: 140px 1fr 60px; gap: .7rem; align-items: center; margin-bottom: .55rem; font-size: .82rem; }
       .dimbar .nm { color: var(--sub); }
       .dimbar .track { height: 9px; background: var(--soft); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
-      .dimbar .fill { height: 100%; background: linear-gradient(90deg, var(--brand), var(--green)); }
+      .dimbar .fill { height: 100%; background: var(--brand); border-radius: 999px; }
       .dimbar .val { text-align: right; font-family: var(--mono); color: var(--sub); }
 
       .toast { position: fixed; bottom: 1.3rem; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: .75rem 1.15rem; border-radius: 10px; box-shadow: var(--shadow2); z-index: 100; font-size: .86rem; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; max-width: 90vw; }
@@ -173,7 +174,7 @@
   <body>
     <div id="app"><div class="center"><div><span class="spin"></span> <span class="sub">Opening ShipGate</span></div></div></div>
     <div id="toast" class="toast"></div>
-    <div class="stamp">build 7</div>
+    <div class="stamp">build 8</div>
 
     <script>
       (function () {
@@ -261,6 +262,7 @@
       function latestSignoff(id) { return forPr(STATE.signoffs, id).sort(function (a, b) { return String(b.decided_at || b.created_at || "").localeCompare(String(a.decided_at || a.created_at || "")); })[0] || null; }
       function noteFor(id) { return forPr(STATE.notes, id).sort(function (a, b) { return String(b.created_at || "").localeCompare(String(a.created_at || "")); })[0] || null; }
       function statusText(s) { return { submitted: "Submitted", evaluating: "Evaluating", needs_fixes: "Needs fixes", ready_for_signoff: "Ready for sign off", approved: "Approved", regressed: "Regressed" }[s] || s; }
+      function statusShort(s) { return { submitted: "New", evaluating: "Running", needs_fixes: "Blocked", ready_for_signoff: "To approve", approved: "Shipped", regressed: "Regressed" }[s] || s; }
 
       function render() {
         var prs = STATE.prs;
@@ -275,7 +277,7 @@
           '<button class="ghost" id="signout">Sign out</button></header>';
 
         html += '<div class="layout"><aside class="queue"><div class="qhead"><h2>Pull requests</h2><span class="dim mono">' + prs.length + "</span></div>" +
-          '<div class="kpis">' + kpi(blocked, "Blocked", "var(--red)") + kpi(waiting, "Awaiting sign off", "var(--green)") + kpi(shipped, "Shipped", "var(--brand)") + "</div>";
+          '<div class="kpis">' + kpi(blocked, "Blocked", "var(--red)") + kpi(waiting, "To approve", "var(--green)") + kpi(shipped, "Shipped", "var(--brand)") + "</div>";
         html += prs.length ? prs.map(prCard).join("") : '<div style="padding:2rem 1.15rem;text-align:center" class="sub">No pull requests yet. Click Submit a PR to gate one.</div>';
         html += "</aside><main class='detail' id='detail'>" + detailHTML(STATE.sel) + "</main></div>";
 
@@ -292,7 +294,7 @@
         return '<button class="prcard' + (p.id === STATE.sel ? " sel" : "") + '" data-pr="' + esc(p.id) + '">' +
           '<div class="scoreb ' + cls + '">' + (ev ? '<span class="spin"></span>' : (sc == null ? "?" : sc)) + "</div>" +
           '<div class="prmeta"><div class="t">' + esc(p.title) + "</div><div class='s'><span class='mono'>" + esc(p.repo) + " " + esc(p.pr_number) + "</span> by " + esc(p.owner || "unknown") + "</div></div>" +
-          '<div class="prright"><span class="badge ' + esc(p.status) + '">' + esc(statusText(p.status)) + "</span>" + (crit ? '<span class="crit">' + crit + " critical</span>" : "") + "</div></button>";
+          '<div class="prright"><span class="badge ' + esc(p.status) + '">' + esc(statusShort(p.status)) + "</span>" + (crit ? '<span class="crit">' + crit + " crit</span>" : "") + "</div></button>";
       }
 
       function detailHTML(id) {
