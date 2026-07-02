@@ -1,112 +1,75 @@
-# ShipGate — release-readiness gate for pull requests
+# ShipGate
 
-Every AI tool reviews code and leaves comments. **None of them makes the release
-decision.** ShipGate does: a PR is submitted, evaluated by deterministic checks plus a
-review agent, scored **0–100**, and either **blocked** or sent to a **human sign-off**.
-On approval it generates release notes and writes a **signed audit record**, and it
-**re-runs on new commits to catch regressions**.
+ShipGate is a release readiness gate for pull requests, built on Lemma.
 
-Built on Lemma. Live app: **https://shipgate.apps.lemma.work**
+Most tools that look at a pull request stop at leaving comments. ShipGate does the part they skip. It takes a PR, runs a set of deterministic checks and a review agent over it, gives the change a readiness score out of 100, and then either blocks it or hands it to a person to sign off. Once someone approves, it writes the release notes and a signed record of who approved it, when, at what score, and with which risks still open. When new commits land it runs again, so a change that passed before does not quietly regress.
 
----
+The live app is at https://shipgate.apps.lemma.work
 
-## Architecture (Lemma primitives)
+## Why I built this
 
-| Layer | Resource | Role |
-|---|---|---|
-| **Tables** | `pull_requests`, `checklist_results`, `risk_flags`, `sign_offs`, `release_notes` | All state. Every risk is a tracked row with severity + exact evidence. |
-| **Files** (`/knowledge`) | `readiness_rubric.md`, `definition_of_done.md`, `notes_template.md` | Agent memory: the scoring model + the team's editable definition-of-done. |
-| **Functions** (deterministic, no LLM) | `parse_pr`, `run_checklist`, `compute_score`, `gate_decision` | The defensible core: parse the diff, run the 7 checks, compute the reproducible score, gate. |
-| | `evaluate_pr`, `record_signoff` | Orchestration: start the workflow; persist a human sign-off as an audit record. |
-| **Agent** | `release-reviewer` | Judgment the checklist can't do: claim-vs-code gaps, correctness/broken-flow risks, breaking changes, a test plan, and a release-notes draft. |
-| **Workflow** | `evaluate-and-gate` | `checklist → score → gate (deterministic) → agent → re-score → re-gate`. The deterministic gate runs **first**, so a PR is always gated even if the agent step hiccups. |
-| **App** | `shipgate` (single-file HTML) | The readiness dashboard: queue, score gauge, checklist, risk flags, test plan, notes, the Approve/Request-changes gate, and the signed audit record. |
+Small teams ship fast and keep missing the same handful of things. A migration with no rollback path. A new endpoint that ships with no test. A description that claims one thing while the diff quietly does another. Docs and release notes that never get written.
 
-### The Release-Readiness Score (hero feature)
+The thing is, reviewing a diff is not the same as deciding it is safe to release. Plenty of tools read the diff and leave comments, but a pile of comments is not a decision. Nobody actually owns the go or no go call, so people merge on gut feel and afterwards there is no record of who approved what with which risks left open. ShipGate is my attempt to make that decision a real, owned, recorded step.
 
-Six weighted dimensions summing to 100 — correctness 30, test coverage 20, migration
-safety 15, breaking-change surface 15, docs/changelog 12, claim-vs-code 8. Each dimension
-starts full; every **open** risk flag subtracts a severity-scaled penalty (critical 100%,
-serious 60%, moderate 30%, minor 10%, capped at the dimension weight). **Any open critical
-caps the total at 59 (auto-block).** Deterministic and reproducible — defensible
-line-by-line. Full model in `knowledge/readiness_rubric.md`.
+## How it works
 
-**Gate:** block if score < 70 **or** any open critical. A block on a previously-approved
-PR is a **regression**.
+Everything lives in one Lemma pod.
 
----
+The tables hold the state. There is one for pull requests, one for the checklist results, one for risk flags, one for sign offs, and one for release notes. Every risk ShipGate finds becomes a row with a severity and the exact file and line it came from, so nothing is hand wavy.
 
-## Setup from scratch (rebuild this pod)
+The files under the knowledge folder are the agent's memory. One holds the scoring rubric, one holds the team's definition of done, and one holds the release notes template. They are plain markdown, so a team can edit what ready means and the gate follows along.
 
-```bash
-# 0. tooling + auth (once)
-uv tool install lemma-terminal
-lemma servers cloud --use
-lemma auth login
-lemma skills install
+The functions are the deterministic core, and there is no model in them at all. parse_pr reads the diff and pulls out the changed files, the migrations, the new endpoints, the tests, and anything that looks like a secret or a leftover debug line. run_checklist runs the seven checks and writes a row for each one. compute_score turns the open risk flags into a number. gate_decision decides block or pass. Because this part is just code, the same diff always produces the same score, and you can defend it line by line.
 
-# 1. create the pod and import the bundle (tables → files → functions → agent → workflow)
-lemma pods create shipgate --description "Release-readiness gate for pull requests."
+The agent, called release-reviewer, does the judgment the checklist cannot. It compares what the PR claims against what the diff actually does and flags the gaps, for example a description that promises caching when there is no caching in the code. It looks for correctness and broken flow risks, and for breaking changes that would hurt existing callers. It writes each finding as a risk flag with real evidence, drafts a test plan for the edge cases the change introduces, and drafts the release notes.
+
+The workflow, evaluate-and-gate, ties it together. It runs the checklist, scores and gates the PR first so the deterministic result always lands, then lets the agent add its findings and re scores. I put the deterministic gate before the agent on purpose, so that if the model has a bad moment the PR is still gated correctly instead of getting stuck.
+
+The app is the dashboard where all of this is visible. You see the queue on the left with a score badge and status for each PR, and when you open one you get the score, the checklist with evidence, the risk flags, the test plan, and the release notes. When a PR passes, the Approve and Request changes buttons show up. When it is approved, you see the signed record and the final notes.
+
+## The score
+
+The score is spread across six weighted parts that add up to 100. Correctness carries 30, test coverage 20, migration safety 15, breaking change surface 15, docs and changelog 12, and claim versus code 8.
+
+Each part starts at its full weight. Every open risk flag takes a bite out of its part depending on severity. A critical takes the whole thing, a serious takes most of it, and smaller ones take less. Any open critical caps the whole score at 59, which means it is an automatic block. A PR is ready for sign off when the score is at least 70 and there are no open criticals. Anything below that blocks and goes back for fixes. If a change that was already approved starts failing again, that is a regression and it gets called out.
+
+## Running it yourself
+
+You need the Lemma CLI and an account. Once you are logged in:
+
+```
+lemma pods create shipgate --description "Release readiness gate for pull requests."
 lemma config set-default-pod shipgate
 lemma pods import .
+```
 
-# 2. upload the agent-memory files (file CONTENTS do not travel in bundles)
+The file contents do not travel inside a bundle, so upload the three knowledge files after the import:
+
+```
 lemma files upload ./knowledge/readiness_rubric.md   /knowledge/readiness_rubric.md
 lemma files upload ./knowledge/definition_of_done.md /knowledge/definition_of_done.md
 lemma files upload ./knowledge/notes_template.md     /knowledge/notes_template.md
+```
 
-# 3. deploy the dashboard (public slug is global; change if taken)
+Then deploy the dashboard. The public slug is global, so pick another name if this one is taken:
+
+```
 lemma apps deploy shipgate ./app/index.html --yes
-
-# 4. seed the demo (see seed/seed.ps1)
 ```
 
-> **Grants note (zero-access by default).** `evaluate_pr` holds `workflow.read` +
-> `workflow.execute` on `evaluate-and-gate`; `run_checklist` writes `checklist_results`
-> and `risk_flags`; the agent writes `risk_flags`, `release_notes`, and only the
-> `test_plan` field of `pull_requests`; `record_signoff` writes `sign_offs`. All in the
-> bundle JSON, replaced on import.
+To land the demo data, run seed/seed.ps1. Records do not travel inside a bundle either, so this script creates the two example PRs, runs them through the gate, and approves the clean one.
 
----
+## Trying the demo loop
 
-## Verify (smoke test)
+Open the app. The coupon PR is blocked with its score in the red and a few risks called out, including a migration with no rollback, a new endpoint with no test, and a claim in the description that the diff never delivers. Open it and read the test plan.
 
-```bash
-# deterministic core on a pasted diff:
-lemma functions run parse_pr --file ./payloads/sample_pr.json
+Now hit Edit diff and paste the diff from seed/prA_fixed.json, which adds the rollback, a test, a changelog entry, docs, a version bump, and an honest description. Save and re evaluate, and the score jumps into the nineties and the PR moves to ready for sign off. Approve it, and the release notes finalize and the signed record appears.
 
-# full pipeline on the seeded blocked PR:
-lemma workflows run evaluate-and-gate --file ./payloads/pr1_id.json
-lemma query run "select title, status, readiness_score from pull_requests"
-lemma records list risk_flags --limit 10
-```
+Then paste seed/prA_regressed.json, which sneaks in an irreversible follow up migration, and re evaluate. The PR flips to regressed and the problem is flagged again. It gates every release, not just the first one.
 
-Expected for the blocked coupon PR: **needs_fixes**, score ≈ 59, open flags including a
-critical `migration` (no down-path), a serious `tests` (no test), and a serious
-`claim_gap` (description promises caching/retry that the diff doesn't contain).
+## What is in and what is next
 
----
+Right now it does the manual PR submit, the seven deterministic checks, the score, the agent findings and test plan and release notes, the approval gate, the signed record, the regression rerun, and the dashboard.
 
-## Demo loop (block → fix → approve → regress)
-
-1. Open the app. The **coupon PR** is `needs_fixes` — score in the red, three evidenced
-   risks, the gate blocking. Show the auto-generated test plan.
-2. **Edit diff** → paste `seed/prA_fixed.json`'s diff (adds a down-migration, a test,
-   changelog/docs/version, honest description) → **Save & re-evaluate** → score jumps to
-   the 90s, `ready_for_signoff`.
-3. **Approve for release** → sign-off recorded, release notes final, **signed audit
-   record** shown (approver, time, score at sign-off, open criticals).
-4. **Edit diff** → paste `seed/prA_regressed.json`'s diff (irreversible follow-up
-   migration) → re-evaluate → **regressed**, flagged. "It gates every release, not just
-   the first."
-
----
-
-## MVP cut line
-
-**Ships:** manual PR submit, 7 deterministic checks, the score, agent claim-vs-code +
-risk flags + test plan + release notes, the approval gate, the signed record, regression
-re-run, the dashboard.
-
-**Deferred (roadmap):** live GitHub webhook auto-trigger, posting results back to the
-GitHub PR, full-codebase indexing, multi-repo, approve-from-Slack.
+Things I would add next are a live GitHub webhook so it triggers itself, posting the result back onto the GitHub PR, indexing the whole codebase for deeper context, multi repo support, and approving straight from Slack.
