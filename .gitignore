@@ -6,3 +6,7 @@ Thumbs.db
 # local scratch (not part of the pod bundle)
 /tmp/
 *.log
+
+# personal reference, not for the public repo
+DECK.md
+DEMO_SCRIPT.md
