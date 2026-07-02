@@ -28,6 +28,8 @@ The workflow, evaluate-and-gate, ties it together. It runs the checklist, scores
 
 The app is the dashboard where all of this is visible. You see the queue on the left with a score badge and status for each PR, and when you open one you get the score, the checklist with evidence, the risk flags, the test plan, and the release notes. When a PR passes, the Approve and Request changes buttons show up. When it is approved, you see the signed record and the final notes.
 
+Every approval also gets a tamper evident certificate. When someone signs off, ShipGate stores a SHA 256 hash taken over the exact decision facts, the pull request id, the decision, the score, the open criticals, the approver, and the time. Anyone can recompute that hash from the recorded fields, so if the score or the risks or the approver were changed after the fact the certificate no longer matches. It turns the sign off from a note into something you can actually verify.
+
 ## The score
 
 The score is spread across six weighted parts that add up to 100. Correctness carries 30, test coverage 20, migration safety 15, breaking change surface 15, docs and changelog 12, and claim versus code 8.

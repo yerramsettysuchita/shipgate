@@ -2,6 +2,7 @@
 #output_type_name: RecordSignoffResult
 #function_name: record_signoff
 
+import hashlib
 from datetime import datetime, timezone
 from typing import Optional
 from pydantic import BaseModel
@@ -42,6 +43,17 @@ async def record_signoff(ctx: FunctionContext, data: RecordSignoffInput) -> Reco
     decision = "approved" if data.decision == "approved" else "changes_requested"
     now = datetime.now(timezone.utc).isoformat()
 
+    # Tamper-evident certificate: a SHA-256 over the exact decision facts. Anyone
+    # can recompute it from the recorded fields; if the score, approver, risks, or
+    # time were altered after sign off, the hash no longer matches. This turns the
+    # audit record into a verifiable release certificate.
+    payload = "|".join([
+        data.pr_id, decision, str(score), str(open_criticals),
+        data.approver, now,
+    ])
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    certificate_id = "SG-" + digest[:20].upper()
+
     signoff = pod.table("sign_offs").create({
         "pr_id": data.pr_id,
         "decision": decision,
@@ -50,6 +62,7 @@ async def record_signoff(ctx: FunctionContext, data: RecordSignoffInput) -> Reco
         "score_at_signoff": score,
         "open_criticals": open_criticals,
         "decided_at": now,
+        "certificate_id": certificate_id,
     })
 
     new_status = "approved" if decision == "approved" else "needs_fixes"
